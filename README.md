@@ -19,44 +19,37 @@
 
 ## 🏗️ 2. 시스템 아키텍처 (Architecture)
 
-대용량 트래픽 부하 분산과 실시간성 보장을 위해 엔드포인트 역할에 따라 시스템을 3개의 멀티 모듈 및 독립적인 서버 스택으로 분리했습니다.
+선착순 포획 판정은 Redis에서 빠르게 처리하고, 포인트 지급은 Kafka를 통해 비동기로 처리합니다.
+프로젝트는 `api`, `worker`, `common` 3개 모듈로 구성합니다.
 
-[ Desktop Client Widget ]
-│
-┌────────────────────────┼────────────────────────┐
-▼ (HTTPS)                ▼ (HTTPS)                ▼ (HTTPS)
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   API Core Server│     │   Market Server  │     │   Raid Server    │
-│  (User/Inventory)│     │(Exchange/Ledger) │     │ (Boss / Ranking) │
-└────────┬─────────┘     └────────┬─────────┘     └────────┬─────────┘
-│                        │                        │
-▼                        ▼                        ▼
-┌────────────────────────────────────────────────────────────────────┐
-│              Distributed In-Memory Cache (Redisson Lock)            │
-│  - [Redis] Fast Queueing / Concurrency Control / Sorted Set        │
-└────────────────────────────────────────────────────────────────────┘
-│
-▼ (Produce Event)
-┌────────────────────────────────────────────────────────────────────┐
-│             Event Streaming Pipeline [Apache Kafka]                │
-│  - Topics: trade-completed, boss-defeated, reward-distribution     │
-└────────────────────────────────────────────────────────────────────┘
-│
-▼ (Consume & Process Async)
-┌────────────────────────────────────────────────────────────────────┐
-│                      Worker & Settlement Batch                     │
-│  - Bulk Reward Insert / Ledger Writing / Dead Letter Queue         │
-└────────────────────────────────────────────────────────────────────┘
-│
-▼ (Data Persistence)
-┌────────────────────────────────────────────────────────────────────┐
-│                    RDB [Spring Data JPA / Querydsl]                │
-│  - User / Item / Inventory / Trade Ledger                          │
-└────────────────────────────────────────────────────────────────────┘
+```text
+[ 데스크톱 위젯 클라이언트 ]
+        │  HTTPS / WebSocket
+        ▼
+     [ Nginx ]   /api → API 서버
+        │        /ws  → WebSocket (실시간 알림)
+        ▼
+   [ API 서버 ] ── Redis : 선착순 판정(Lua), 랭킹(ZSET)
+        │
+        ▼  당첨 확정 + Outbox 기록 (같은 트랜잭션)
+     [ MySQL ]
+        │  Outbox 발행
+        ▼
+     [ Kafka ]
+        │
+        ▼
+  [ Worker 서버 ] ── 포인트 지급, 실패 재시도, DLQ
+        │
+        ▼
+     [ MySQL ]
+```
 
-*   **API Core / Market / Raid Server:** 도메인별 분산 환경으로 대용량 유저 유입 시 독립적인 스케일 아웃이 가능하도록 격리
-*   **Redis Layer:** 분산 락(Redisson)을 통한 동시성 제어 및 실시간 랭킹(ZSET), 시세 캐싱을 통한 RDB 부하 원천 차단
-*   **Kafka Cluster:** 시스템 간 결합도를 낮추고(Decoupling), 순간 폭발 트래픽을 안전하게 버퍼링하여 소비하는 부하 완충(Throttling) 척추 역할 수행
+| 구성 요소 | 역할 |
+|---|---|
+| API 서버 | 몬스터 스폰, 클릭 요청 처리, 랭킹, WebSocket 알림 |
+| Redis | 선착순 원자적 판정(Lua), 랭킹 |
+| MySQL | 회원, 포인트, 포획 결과, Outbox 저장 |
+| Kafka + Worker | 당첨 이벤트를 받아 포인트를 비동기로 지급 |
 
 ---
 
