@@ -36,4 +36,8 @@ out/
 ### VS Code ###
 .vscode/
 
+### DB Conn ###
+.env
+!docker-compose.yml
+
 .DS_Store
