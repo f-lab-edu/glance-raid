@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>오피스 버디 테스트</title>
+</head>
+<body>
+<h1>몬스터 잡기</h1>
+<label>몬스터 ID: <input type="number" id="monsterId" value="1" min="1"></label>
+<button id="captureBtn">잡기!</button>
+<pre id="result"></pre>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script>
+    $('#captureBtn').on('click', function () {
+        var monsterId = $('#monsterId').val();
+
+        if (!monsterId) {
+            $('#result').text('몬스터 ID 없음!!!');
+            return;
+        }
+
+        $.ajax({
+            url: '/api/v1/monsters/' + monsterId + '/click',
+            type: 'POST',
+            success: function (data) {
+                $('#result').text(JSON.stringify(data, null, 2));
+            },
+            error: function (xhr) {
+                $('#result').text('실패: ' + xhr.status);
+            }
+        });
+    });
+</script>
+</body>
+</html>
