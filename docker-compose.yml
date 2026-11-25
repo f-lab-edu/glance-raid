@@ -15,5 +15,13 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
 
+  nginx:
+    image: nginx:1.30.8
+    container_name: glance-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d:ro
 volumes:
   mysql-data:
