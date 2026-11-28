@@ -23,5 +23,14 @@ services:
       - "80:80"
     volumes:
       - ./nginx:/etc/nginx/conf.d:ro
+
+  redis:
+    image: redis:8.12.0
+    container_name: glance-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
 volumes:
   mysql-data:
